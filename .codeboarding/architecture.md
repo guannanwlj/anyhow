@@ -2,21 +2,22 @@
 
 ## Overview
 
-This is anyhow, a Rust crate for ergonomic error handling built around a single anyhow::Error type that can wrap any failure and carry user context. The main entry point is the Macros & Public Facade module, where lib.rs re-exports the public API and the anyhow!/bail!/ensure! macros build ad-hoc errors via the core constructors. At runtime, Error Core & Type Erasure implements Error as a one-word thin pointer to a type-erased payload dispatched through a per-type vtable for drop, clone, and downcast, Diagnostics & Context renders that error with its source chain, backtrace, and attached context, and Compiler-Capability Gating probes the toolchain at build time so the crate works on both stable and nightly Rust.
+This is the anyhow error handling crate for Rust, whose main entry point is the anyhow::Error/anyhow::Result type that accepts any std error, ad-hoc message, or boxed trait object. Error Core & Type Erasure backs that type with a hand-rolled vtable yielding a one-word thin pointer with downcasting, while Backtrace & Nightly Interop captures a std::backtrace::Backtrace when the underlying error lacks one and bridges the nightly provide/request_ref API. The rest of the runtime is split among Context, Chains & Rendering for attaching user context, iterating source chains, and printing the 'Error: … / Caused by: …' output, Macros & Tagged Dispatch for anyhow!/bail!/ensure! ergonomics via autoref specialization emulation, and Build & Toolchain Detection for compiler probing and feature gating.
 
 ## Architectural Patterns
 
-- Facade / Single Core Abstraction
-- Layered internal architecture
-- Type erasure / Boxing pattern
-- Decorator/Wrapper pattern (error chains)
-- Conditional compilation (feature-gated and version-gated)
-- Macro API layer
+- Facade / single-crate API surface
+- Type erasure via trait objects
+- Flat layered module organization
+- Decorator/context-attachment pattern
+- Macro layer over runtime layer
+- Conditional compilation boundary
+- Adaptor/shim pattern
 
 ## Project Context
 
-- **Project Type:** Rust utility/error-handling library
-- **Domain:** Systems Programming / Software Infrastructure
+- **Project Type:** Rust error-handling foundation library
+- **Domain:** Systems programming / Software infrastructure
 
 ## Tech Stack
 
@@ -46,29 +47,31 @@ _Each module links to a per-module keyword file listing its native symbols (file
 
 ### Error Core & Type Erasure
 
-Defines anyhow::Error as a one-word thin pointer wrapping type-erased error payloads, using a per-type vtable for drop/ref/downcast plus repr(transparent) wrapper types and raw-pointer aliases, and exposes the ErrorKind classification trait. [evidence-linked: 17 call edges]
+Implements the anyhow::Error/anyhow::Result types with construction from any std error, ad-hoc message, or boxed trait object, plus downcasting and conversion via a hand-rolled vtable giving a one-word thin pointer. [evidence-linked: 19 call edges]
 
-- Keywords: [`keywords/1.md`](keywords/1.md) — 37 scored symbol(s)
+- Keywords: [`keywords/1.md`](keywords/1.md) — 38 scored symbol(s)
 
-### Diagnostics & Context
+### Backtrace & Nightly Interop
 
-Decorates and renders errors by attaching user context to Result/Option, iterating the source-cause chain, capturing backtraces when the underlying error lacks one, and producing the pretty Display/Debug output. [evidence-linked: 14 call edges]
+Captures a std::backtrace::Backtrace when the underlying error lacks one via the backtrace!/backtrace_if_absent! macros and bridges the nightly error_generic_member_access provide/request_ref API. [evidence-linked: 1 call edges]
 
-- Keywords: [`keywords/2.md`](keywords/2.md) — 29 scored symbol(s)
+- Keywords: [`keywords/2.md`](keywords/2.md) — 23 scored symbol(s)
 
-### Macros & Public Facade
+### Context, Chains & Rendering
 
-Provides the public crate surface and ergonomic entry points, with lib.rs declaring internal modules and re-exporting the documented API while anyhow!/bail! and ensure! macros build ad-hoc errors by delegating to the core constructors. [evidence-linked: 3 call edges]
+Attaches user context to Result/Option via the Context trait, iterates source-cause chains, and renders the human-readable 'Error: … / Caused by: …' Debug/Display output. [evidence-linked: 14 call edges]
 
-- Keywords: [`keywords/3.md`](keywords/3.md) — 31 scored symbol(s)
+- Keywords: [`keywords/3.md`](keywords/3.md) — 24 scored symbol(s)
 
-### Compiler-Capability Gating
+### Macros & Tagged Dispatch
 
-Probes the build environment to detect whether the nightly error_generic_member_access provider API is usable and emits version-dependent cfg flags, keeping the crate compatible across stable/nightly and old rustc versions.
+Provides user-facing ergonomics (anyhow!, bail!, ensure!) and the autoref tagged dispatch (AdhocKind/TraitKind/BoxedKind) that emulates specialization to decide how anyhow!($expr) is converted. [evidence-linked: 4 call edges]
 
-- Keywords: [`keywords/4.md`](keywords/4.md) — 9 scored symbol(s)
+- Keywords: [`keywords/4.md`](keywords/4.md) — 30 scored symbol(s)
 
-### Test Suite & Packaging
+### Build & Toolchain Detection
 
-Exercises the crate's public behavior end-to-end through the integration test suite and defines the crate's packaging, features, and licensing metadata.
+Build script that probes the compiler (compiling src/nightly.rs) to enable error_generic_member_access, emits version-gated cfgs, and includes the crate/feature manifest and toolchain pin.
+
+- Keywords: [`keywords/5.md`](keywords/5.md) — 4 scored symbol(s)
 
